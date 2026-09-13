@@ -374,23 +374,23 @@ const URL_BACKEND = "https://script.google.com/macros/s/AKfycbz7mnnpc1LproMX96Mz
    ===================================================================== */
 
 const CATALOGO = [
-  { codice: "felpa-1", nome: "Felpa con cappuccio - Modello 1",
+  { codice: "felpa-1", nome: "Felpa con cappuccio - Year of the Roosters viola",
     descrizione: "", prezzo: 35, taglie: ["S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "felpa-2", nome: "Felpa con cappuccio - Modello 2",
+  { codice: "felpa-2", nome: "Felpa con cappuccio - Year of the Roosters gialla",
     descrizione: "", prezzo: 35, taglie: ["S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "felpa-3", nome: "Felpa con cappuccio - Modello 3",
+  { codice: "felpa-3", nome: "Felpa con cappuccio - Roosters melange",
     descrizione: "", prezzo: 35, taglie: ["S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "tshirt-1", nome: "T-shirt - Modello 1",
+  { codice: "tshirt-1", nome: "T-shirt - Year of the Roosters melange",
     descrizione: "", prezzo: 15, taglie: ["XS", "S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "tshirt-2", nome: "T-shirt - Modello 2",
+  { codice: "tshirt-2", nome: "T-shirt - Year of the Roosters bianca",
     descrizione: "", prezzo: 15, taglie: ["XS", "S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "tshirt-3", nome: "T-shirt - Modello 3",
+  { codice: "tshirt-3", nome: "T-shirt - Roosters bordeaux",
     descrizione: "", prezzo: 15, taglie: ["XS", "S", "M", "L", "XL", "2XL", "3XL"] },
-  { codice: "tshirt-4", nome: "T-shirt - Modello 4",
+  { codice: "tshirt-4", nome: "T-shirt - Roosters blu",
     descrizione: "", prezzo: 15, taglie: ["XS", "S", "M", "L", "XL", "2XL", "3XL"] },
   { codice: "cappellino", nome: "Cappellino baseball",
     descrizione: "", prezzo: 10, taglie: [] },
-  { codice: "beanie", nome: "Beanie",
+  { codice: "beanie", nome: "Beanie hat",
     descrizione: "", prezzo: 12, taglie: [] },
   { codice: "shopper-bag", nome: "Shopper bag",
     descrizione: "", prezzo: 5, taglie: [] },
@@ -563,14 +563,57 @@ document.getElementById("paga").addEventListener("click", function () {
     alert("Shop non ancora collegato. Riprova fra poco.");
     return;
   }
-  this.disabled = true;
-  this.textContent = "Un attimo\u2026";
+
+  const bottone = this;
+  bottone.disabled = true;
+  bottone.textContent = "Un attimo\u2026";
 
   const ordine = carrello.map(function (v) {
     return v.codice + "~" + v.taglia + "~" + v.qta;
   }).join("|");
 
-  window.location.href = URL_BACKEND + "?ordine=" + encodeURIComponent(ordine);
+  // Chiediamo al backend l'indirizzo di pagamento e ci andiamo da soli:
+  // niente pagine intermedie di Google, che restano bloccate.
+  const nome = "roostersCB" + Date.now();
+  let chiuso = false;
+
+  function fallito(messaggio) {
+    if (chiuso) return;
+    chiuso = true;
+    try { delete window[nome]; } catch (e) { window[nome] = undefined; }
+    if (tag.parentNode) tag.parentNode.removeChild(tag);
+    bottone.disabled = false;
+    bottone.textContent = "Vai al pagamento";
+    const av = document.getElementById("avviso");
+    av.className = "avviso ko";
+    av.textContent = messaggio;
+    apri(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  window[nome] = function (dati) {
+    if (chiuso) return;
+    if (dati && dati.url) {
+      chiuso = true;
+      window.location.href = dati.url;
+    } else {
+      fallito("Non siamo riusciti ad aprire il pagamento. Riprova, " +
+              "oppure scrivici e completiamo l'ordine insieme.");
+    }
+  };
+
+  const tag = document.createElement("script");
+  tag.src = URL_BACKEND + "?callback=" + nome +
+            "&ordine=" + encodeURIComponent(ordine);
+  tag.onerror = function () {
+    fallito("Connessione al pagamento non riuscita. Controlla la rete " +
+            "e riprova.");
+  };
+  document.body.appendChild(tag);
+
+  setTimeout(function () {
+    fallito("Il pagamento ci sta mettendo troppo. Riprova fra un minuto.");
+  }, 20000);
 });
 
 /* ---------- ritorno da Stripe ---------- */
